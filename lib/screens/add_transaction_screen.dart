@@ -29,13 +29,25 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   @override
   void initState() {
     super.initState();
-    // السحر: إذا تم إرسال معاملة قديمة، قم بتعبئة الحقول ببياناتها!
     if (widget.existingTransaction != null) {
       final tx = widget.existingTransaction!;
       _amountController.text = tx.amount.toString();
       _noteController.text = tx.note;
       _selectedCategory = tx.category;
       _selectedDate = tx.date;
+    }
+  }
+
+  // [إصلاح B-3] دالة آمنة للتحقق من صحة الفئة — تعمل بعد اكتمال البناء لا أثناءه
+  void _validateSelectedCategory(List<String> categories) {
+    if (_selectedCategory != null && !categories.contains(_selectedCategory)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _selectedCategory = null;
+          });
+        }
+      });
     }
   }
 
@@ -133,7 +145,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   @override
   Widget build(BuildContext context) {
     final color = widget.isIncome ? Colors.green : Colors.red;
-    final currency = Provider.of<TransactionProvider>(context).currency;
+    // [إصلاح P-4] listen: false — لا نحتاج لإعادة بناء الشاشة عند تغيير العملة
+    final currency = Provider.of<TransactionProvider>(context, listen: false).currency;
     
     // 🔴 متغير يحدد هل نحن في وضع التعديل أم لا
     final isEditing = widget.existingTransaction != null;
@@ -168,7 +181,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) return 'الرجاء إدخال المبلغ';
-                    if (double.tryParse(value) == null) return 'الرجاء إدخال رقم صحيح';
+                    final amount = double.tryParse(value);
+                    if (amount == null) return 'الرجاء إدخال رقم صحيح';
+                    // [إصلاح B-2] رفض الأرقام السالبة والصفر
+                    if (amount <= 0) return 'يجب أن يكون المبلغ أكبر من الصفر';
                     return null;
                   },
                 ),
@@ -179,13 +195,13 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                       child: Consumer<TransactionProvider>(
                         builder: (context, provider, child) {
                           final categories = widget.isIncome ? provider.incomeCategories : provider.expenseCategories;
-                          
-                          if (_selectedCategory != null && !categories.contains(_selectedCategory)) {
-                            _selectedCategory = null;
-                          }
+
+                          // [إصلاح B-3] نستدعي الدالة الآمنة بدلاً من تعديل State مباشرة داخل build()
+                          _validateSelectedCategory(categories);
 
                           return DropdownButtonFormField<String>(
-                            initialValue: _selectedCategory,
+                            key: ValueKey(_selectedCategory), // إعادة البناء عند تغيير القيمة
+                            initialValue: _selectedCategory, // [إصلاح B-3] initialValue — الأسلوب الصحيح
                             items: categories.map((cat) {
                               return DropdownMenuItem(value: cat, child: Text(cat));
                             }).toList(),

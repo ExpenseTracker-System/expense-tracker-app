@@ -13,13 +13,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<TransactionProvider>(context, listen: false).fetchTransactions();
-    });
-  }
+  // [إصلاح B-6] initState لم تعد تحتاج لاستدعاء fetchTransactions()
+  // لأن TransactionProvider يُحمّل البيانات تلقائياً في Constructor
 
   // 🔴 إضافة جديدة: دالة لإظهار نافذة اختيار العملة
   void _showSettingsDialog(BuildContext context, TransactionProvider provider) {
@@ -90,24 +85,13 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: Consumer<TransactionProvider>(
         builder: (context, provider, child) {
-          double totalIncome = 0;
-          double totalExpense = 0;
-          for (var tx in provider.transactions) {
-            if (tx.isIncome) {
-              totalIncome += tx.amount;
-            } else {
-              totalExpense += tx.amount;
-            }
-          }
-          double balance = totalIncome - totalExpense;
-
+          // [إصلاح P-1] نقرأ القيم الجاهزة من Provider مباشرة — لا حسابات هنا
           return Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 🔴 التعديل هنا: تمرير العملة (provider.currency) للبطاقة
-                _buildSummaryCard(balance, totalIncome, totalExpense, provider.currency),
+                _buildSummaryCard(provider.balance, provider.totalIncome, provider.totalExpense, provider.currency),
                 const SizedBox(height: 20),
 
                 Row(
@@ -186,8 +170,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                 title: Text(tx.category, style: const TextStyle(fontWeight: FontWeight.bold)),
                                 subtitle: Text(tx.note.isNotEmpty ? tx.note : 'بدون ملاحظة'),
                                 trailing: Text(
-                                  // 🔴 التعديل هنا: طباعة العملة بجانب الرقم في القائمة
-                                  '${tx.isIncome ? '+' : '-'}${tx.amount} ${provider.currency}',
+                                  // [إصلاح B-4] تنسيق الرقم بمنزلتين عشريتين
+                                  '${tx.isIncome ? '+' : '-'}${tx.amount.toStringAsFixed(2)} ${provider.currency}',
                                   style: TextStyle(
                                     color: tx.isIncome ? Colors.green : Colors.red,
                                     fontWeight: FontWeight.bold,
@@ -229,8 +213,8 @@ class _HomeScreenState extends State<HomeScreen> {
           const Text('الرصيد الحالي', style: TextStyle(color: Colors.white70, fontSize: 16)),
           const SizedBox(height: 8),
           Text(
-            // 🔴 التعديل هنا: طبعنا العملة بجوار الرصيد
-            '$balance $currency',
+            // [إصلاح B-4] تنسيق الرصيد بمنزلتين عشريتين
+            '${balance.toStringAsFixed(2)} $currency',
             style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 20),
@@ -257,8 +241,8 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Text(title, style: const TextStyle(color: Colors.white70, fontSize: 12)),
             Text(
-              // 🔴 التعديل هنا: طبعنا العملة بجوار الإيراد أو المصروف
-              '$amount $currency', 
+              // [إصلاح B-4] تنسيق المبلغ بمنزلتين عشريتين
+              '${amount.toStringAsFixed(2)} $currency',
               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
             ),
           ],

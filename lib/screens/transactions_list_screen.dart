@@ -35,6 +35,30 @@ class TransactionsListScreen extends StatelessWidget {
                   decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(12)),
                   child: const Icon(Icons.delete, color: Colors.white, size: 30),
                 ),
+                // [إصلاح B-5] نطلب تأكيداً من المستخدم قبل الحذف
+                confirmDismiss: (direction) async {
+                  return await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      title: const Text('تأكيد الحذف', style: TextStyle(fontWeight: FontWeight.bold)),
+                      content: Text(
+                        'هل أنت متأكد من حذف معاملة "${tx.category}" بمبلغ ${tx.amount.toStringAsFixed(2)} ${provider.currency}؟',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text('إلغاء'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                          child: const Text('حذف', style: TextStyle(color: Colors.white)),
+                        ),
+                      ],
+                    ),
+                  ) ?? false;
+                },
                 onDismissed: (direction) {
                   provider.deleteTransaction(tx.id);
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -71,7 +95,8 @@ class TransactionsListScreen extends StatelessWidget {
                       ],
                     ),
                     trailing: Text(
-                      '${tx.isIncome ? '+' : '-'}${tx.amount} ${provider.currency}',
+                      // [إصلاح B-4] تنسيق المبلغ بمنزلتين عشريتين
+                      '${tx.isIncome ? '+' : '-'}${tx.amount.toStringAsFixed(2)} ${provider.currency}',
                       style: TextStyle(color: tx.isIncome ? Colors.green : Colors.red, fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                   ),
