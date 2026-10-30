@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
 
-// أضفنا TickerProviderStateMixin لكي نسمح للشاشة بتشغيل الأنميشن
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -9,9 +8,8 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
-  
-  // 🔴 متغيرات الأنميشن (الحركة)
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
@@ -20,40 +18,33 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   void initState() {
     super.initState();
 
-    // 1. إعداد محرك الحركة (يستغرق ثانيتين)
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
     );
 
-    // 2. حركة الظهور التدريجي (Fade In)
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
     );
 
-    // 3. حركة التكبير والارتداد (Bounce) للأيقونة
     _scaleAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.elasticOut),
     );
 
-    // 4. تشغيل الأنميشن فور فتح الشاشة
     _animationController.forward();
-
-    // 5. تشغيل مؤقت الانتقال للشاشة الرئيسية
     _navigateToHome();
   }
 
-  // دالة الانتقال بعد انتهاء الوقت
-  Future<void>_navigateToHome() async {
-    await Future.delayed(const Duration(seconds: 4)); // ننتظر 4 ثواني لنستمتع بالأنميشن
-    
+  Future<void> _navigateToHome() async {
+    await Future.delayed(const Duration(seconds: 3));
+
     if (mounted) {
       Navigator.pushReplacement(
         context,
-        // انتقال سلس (Fade) للشاشة الرئيسية بدلاً من الانتقال الحاد
         PageRouteBuilder(
           transitionDuration: const Duration(milliseconds: 800),
-          pageBuilder: (context, animation, secondaryAnimation) => const HomeScreen(),
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              const HomeScreen(),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(opacity: animation, child: child);
           },
@@ -62,7 +53,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     }
   }
 
-  // تنظيف الذاكرة من محرك الأنميشن عند الخروج
   @override
   void dispose() {
     _animationController.dispose();
@@ -74,21 +64,19 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     return Scaffold(
       body: Container(
         width: double.infinity,
-        // 🔴 السر الهندسي الأول: التدرج اللوني الفخم (Gradient) للخلفية
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Colors.green[800]!, // أخضر غامق جداً
-              Colors.green[500]!, // أخضر فاتح
-              Colors.teal[700]!,  // لمسة لون أزرق مخضر
+              Colors.green[800]!,
+              Colors.green[500]!,
+              Colors.teal[700]!,
             ],
           ),
         ),
         child: Stack(
           children: [
-            // 🔴 الطبقة الوسطى: الشعار واسم التطبيق (مع الأنميشن)
             Center(
               child: FadeTransition(
                 opacity: _fadeAnimation,
@@ -97,7 +85,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // تصميم الأيقونة داخل دائرة بيضاء بارزة
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
@@ -105,7 +92,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha:0.2),
+                              color: Colors.black.withValues(alpha: 0.2),
                               blurRadius: 20,
                               offset: const Offset(0, 10),
                             ),
@@ -118,7 +105,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                         ),
                       ),
                       const SizedBox(height: 24),
-                      // اسم التطبيق
                       const Text(
                         'محفظتي الذكية',
                         style: TextStyle(
@@ -137,7 +123,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       ),
                       const SizedBox(height: 10),
                       const Text(
-                        'إدارة أموالك بذكاء وسهولة',
+                        'إدارة أموالك ومحافظك بذكاء وسهولة',
                         style: TextStyle(
                           fontSize: 16,
                           color: Colors.white70,
@@ -149,8 +135,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 ),
               ),
             ),
-
-            // 🔴 الطبقة السفلية: توقيع المهندس (يظهر بتدرج ناعم)
             Positioned(
               bottom: 40,
               left: 0,
@@ -159,7 +143,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 opacity: _fadeAnimation,
                 child: Column(
                   children: [
-                    // مؤشر تحميل دائري صغير وأنيق
                     const SizedBox(
                       width: 30,
                       height: 30,
@@ -184,7 +167,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
-                        letterSpacing: 2.0, // تباعد سينمائي بين الحروف
+                        letterSpacing: 2.0,
                         shadows: [
                           Shadow(
                             color: Colors.green[900]!,

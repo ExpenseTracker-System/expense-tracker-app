@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:uuid/uuid.dart';
 import '../models/transaction_model.dart';
 import '../providers/transaction_provider.dart';
 
 class AddTransactionScreen extends StatefulWidget {
   final bool isIncome;
-  // 🔴 التعديل 1: استقبال معاملة قديمة (اختياري، لذلك وضعنا ?)
   final TransactionModel? existingTransaction;
 
   const AddTransactionScreen({
-    super.key, 
+    super.key,
     required this.isIncome,
-    this.existingTransaction, // 🔴 إضافة المتغير للمُنشئ
+    this.existingTransaction,
   });
 
   @override
@@ -19,13 +19,13 @@ class AddTransactionScreen extends StatefulWidget {
 }
 
 class _AddTransactionScreenState extends State<AddTransactionScreen> {
+  static const _uuid = Uuid();
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
   final _noteController = TextEditingController();
   String? _selectedCategory;
   DateTime _selectedDate = DateTime.now();
 
-  // 🔴 التعديل 2: دالة التهيئة (تعمل مرة واحدة عند فتح الشاشة)
   @override
   void initState() {
     super.initState();
@@ -38,7 +38,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     }
   }
 
-  // [إصلاح B-3] دالة آمنة للتحقق من صحة الفئة — تعمل بعد اكتمال البناء لا أثناءه
   void _validateSelectedCategory(List<String> categories) {
     if (_selectedCategory != null && !categories.contains(_selectedCategory)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -58,7 +57,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     super.dispose();
   }
 
-  // 🔴 التعديل 3: دالة الحفظ الذكية (تفرق بين الإضافة والتحديث)
   void _saveTransaction() {
     if (_formKey.currentState!.validate()) {
       if (_selectedCategory == null) {
@@ -68,27 +66,28 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         return;
       }
 
-      // بناء الصندوق بالبيانات الموجودة في الشاشة
+      final provider = Provider.of<TransactionProvider>(context, listen: false);
+      final activeWalletId = provider.currentWallet?.id ?? 'default_wallet';
+
       final transaction = TransactionModel(
-        // إذا كنا نعدل، استخدم الـ ID القديم، وإلا اصنع ID جديد
-        id: widget.existingTransaction?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        id: widget.existingTransaction?.id ?? _uuid.v4(),
         amount: double.parse(_amountController.text),
         category: _selectedCategory!,
-        note: _noteController.text,
+        note: _noteController.text.trim(),
         date: _selectedDate,
         isIncome: widget.isIncome,
+        walletId: widget.existingTransaction?.walletId ?? activeWalletId,
+        createdAt: widget.existingTransaction?.createdAt ?? DateTime.now(),
+        updatedAt: DateTime.now(),
       );
 
-      final provider = Provider.of<TransactionProvider>(context, listen: false);
-
-      // قرار الإرسال: إضافة أم تعديل؟
       if (widget.existingTransaction == null) {
-        provider.addTransaction(transaction); // إضافة جديد
+        provider.addTransaction(transaction);
       } else {
-        provider.updateTransaction(transaction); // 🔴 تحديث القديم
+        provider.updateTransaction(transaction);
       }
 
-      Navigator.pop(context); // إغلاق الشاشة
+      Navigator.pop(context);
     }
   }
 
@@ -110,7 +109,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     final categoryController = TextEditingController();
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (ctx) {
         return AlertDialog(
           title: const Text('إضافة فئة جديدة'),
           content: TextField(
@@ -119,7 +118,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(ctx),
               child: const Text('إلغاء'),
             ),
             ElevatedButton(
@@ -131,7 +130,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   setState(() {
                     _selectedCategory = newCat;
                   });
-                  Navigator.pop(context);
+                  Navigator.pop(ctx);
                 }
               },
               child: const Text('إضافة'),
@@ -145,16 +144,20 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   @override
   Widget build(BuildContext context) {
     final color = widget.isIncome ? Colors.green : Colors.red;
-    // [إصلاح P-4] listen: false — لا نحتاج لإعادة بناء الشاشة عند تغيير العملة
-    final currency = Provider.of<TransactionProvider>(context, listen: false).currency;
-    
-    // 🔴 متغير يحدد هل نحن في وضع التعديل أم لا
+    final provider = Provider.of<TransactionProvider>(context, listen: false);
+    final currency = provider.currency;
+    final walletName = provider.currentWallet?.name ?? 'المحفظة الشخصية';
     final isEditing = widget.existingTransaction != null;
 
     return Scaffold(
       appBar: AppBar(
-        // 🔴 تغيير العنوان بناءً على الوضع
-        title: Text(isEditing ? 'تعديل المعاملة' : (widget.isIncome ? 'إضافة إيراد' : 'إضافة مصروف')),
+        title: Text(
+          isEditing
+              ? 'تعديل المعاملة'
+              : (widget.isIncome
+                  ? 'إضافة إيراد ($walletName)'
+                  : 'إضافة مصروف ($walletName)'),
+        ),
         backgroundColor: color,
         foregroundColor: Colors.white,
       ),
@@ -167,23 +170,32 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               children: [
                 TextFormField(
                   controller: _amountController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   decoration: InputDecoration(
                     labelText: 'المبلغ',
                     prefixIcon: Padding(
-                      padding: const EdgeInsets.only(top: 14, right: 12, left: 12),
+                      padding:
+                          const EdgeInsets.only(top: 14, right: 12, left: 12),
                       child: Text(
                         currency,
-                        style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 16),
+                        style: TextStyle(
+                          color: color,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
                     ),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   validator: (value) {
-                    if (value == null || value.isEmpty) return 'الرجاء إدخال المبلغ';
+                    if (value == null || value.isEmpty) {
+                      return 'الرجاء إدخال المبلغ';
+                    }
                     final amount = double.tryParse(value);
                     if (amount == null) return 'الرجاء إدخال رقم صحيح';
-                    // [إصلاح B-2] رفض الأرقام السالبة والصفر
                     if (amount <= 0) return 'يجب أن يكون المبلغ أكبر من الصفر';
                     return null;
                   },
@@ -193,22 +205,29 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   children: [
                     Expanded(
                       child: Consumer<TransactionProvider>(
-                        builder: (context, provider, child) {
-                          final categories = widget.isIncome ? provider.incomeCategories : provider.expenseCategories;
+                        builder: (context, txProv, child) {
+                          final categories = widget.isIncome
+                              ? txProv.incomeCategories
+                              : txProv.expenseCategories;
 
-                          // [إصلاح B-3] نستدعي الدالة الآمنة بدلاً من تعديل State مباشرة داخل build()
                           _validateSelectedCategory(categories);
 
                           return DropdownButtonFormField<String>(
-                            key: ValueKey(_selectedCategory), // إعادة البناء عند تغيير القيمة
-                            initialValue: _selectedCategory, // [إصلاح B-3] initialValue — الأسلوب الصحيح
-                            items: categories.map((cat) {
-                              return DropdownMenuItem(value: cat, child: Text(cat));
+                            key: ValueKey(_selectedCategory),
+                            initialValue: _selectedCategory,
+                            items: categories.map((String cat) {
+                              return DropdownMenuItem<String>(
+                                value: cat,
+                                child: Text(cat),
+                              );
                             }).toList(),
-                            onChanged: (val) => setState(() => _selectedCategory = val),
+                            onChanged: (val) =>
+                                setState(() => _selectedCategory = val),
                             decoration: InputDecoration(
                               labelText: 'الفئة',
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                               prefixIcon: Icon(Icons.category, color: color),
                             ),
                           );
@@ -229,7 +248,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   decoration: InputDecoration(
                     labelText: 'ملاحظة (اختياري)',
                     prefixIcon: Icon(Icons.note, color: color),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -238,13 +259,18 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   child: InputDecorator(
                     decoration: InputDecoration(
                       labelText: 'التاريخ',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       prefixIcon: Icon(Icons.calendar_today, color: color),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(_selectedDate.toString().substring(0, 10), style: const TextStyle(fontSize: 16)),
+                        Text(
+                          _selectedDate.toString().substring(0, 10),
+                          style: const TextStyle(fontSize: 16),
+                        ),
                         const Icon(Icons.arrow_drop_down),
                       ],
                     ),
@@ -259,12 +285,16 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: color,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                    // 🔴 تغيير نص الزر بناءً على الوضع
                     child: Text(
                       isEditing ? 'تحديث المعاملة' : 'حفظ المعاملة',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
