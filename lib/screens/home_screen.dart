@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/wallet_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/transaction_provider.dart';
 import 'add_transaction_screen.dart';
 import 'login_screen.dart';
+import 'onboarding_screen.dart';
 import 'statistics_screen.dart';
 import 'transactions_list_screen.dart';
 
@@ -16,6 +18,153 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  // 🔴 ضع رقمك في واتساب مع مفتاح الدولة (بدون + أو أصفار في البداية) ورابط لينكد إن الخاص بك هنا:
+  static const String _developerWhatsApp = '967775407610';
+  static const String _developerLinkedIn =
+      'https://www.linkedin.com/in/omar-aref-53b710393?utm_source=share_via&utm_content=profile&utm_medium=member_android';
+
+  Future<void> _openExternalUrl(String urlString) async {
+    final Uri uri = Uri.parse(urlString);
+    try {
+      final bool launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تعذر فتح الرابط على هذا الجهاز')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تعذر فتح الرابط')),
+        );
+      }
+    }
+  }
+
+  // نافذة "تواصل معنا" الاحترافية (واتساب + لينكد إن + إعادة عرض الشرح)
+  void _showContactUsDialog(BuildContext context) {
+    final String whatsappUrl =
+        'https://wa.me/$_developerWhatsApp?text=${Uri.encodeComponent("مرحباً مهندس عمر، أتواصل معك بخصوص تطبيق محفظتي الذكية")}';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Row(
+          children: [
+            Icon(Icons.support_agent_rounded, color: Colors.blue[800], size: 28),
+            const SizedBox(width: 8),
+            const Text(
+              'تواصل معنا',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'نسعد دائماً باستقبال ملاحظاتكم واقتراحاتكم لتطوير تطبيق "محفظتي الذكية" عبر قنوات التواصل المباشرة مع مطور التطبيق:',
+              style: TextStyle(fontSize: 14, color: Colors.black87, height: 1.4),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: Color(0xFF1565C0),
+                    child: Icon(Icons.code, color: Colors.white),
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'المهندس / عمر عارف',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
+                        ),
+                        Text(
+                          'Full-Stack & Mobile Engineer',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            // زر التواصل عبر واتساب
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _openExternalUrl(whatsappUrl);
+                },
+                icon: const Icon(Icons.chat_rounded),
+                label: const Text(
+                  'تواصل مباشرة عبر واتساب (WhatsApp)',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF25D366),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            // زر صفحة لينكد إن
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _openExternalUrl(_developerLinkedIn);
+                },
+                icon: const Icon(Icons.business_center_rounded),
+                label: const Text(
+                  'صفحتنا على لينكد إن (LinkedIn)',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0A66C2),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('إغلاق'),
+          ),
+        ],
+      ),
+    );
+  }
+
   // نافذة اختيار وإدارة المحافظ المتعددة (BottomSheet)
   void _showWalletsBottomSheet(
       BuildContext context, TransactionProvider provider) {
@@ -246,103 +395,133 @@ class _HomeScreenState extends State<HomeScreen> {
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Text('الإعدادات والحساب السحابي',
               style: TextStyle(fontWeight: FontWeight.bold)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // معلومات الحساب السحابي
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue[50],
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      authProvider.isAuthenticated
-                          ? Icons.verified_user
-                          : Icons.cloud_off,
-                      color: authProvider.isAuthenticated
-                          ? Colors.green[700]
-                          : Colors.grey[700],
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            authProvider.isAuthenticated
-                                ? authProvider.currentUser!.username
-                                : 'الوضع المحلي (بدون حساب)',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          Text(
-                            authProvider.isAuthenticated
-                                ? authProvider.currentUser!.email
-                                : 'سجل دخولك لتفعيل النسخ الاحتياطي السحابي',
-                            style: const TextStyle(
-                                fontSize: 12, color: Colors.black54),
-                          ),
-                        ],
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[50],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        authProvider.isAuthenticated
+                            ? Icons.verified_user
+                            : Icons.cloud_off,
+                        color: authProvider.isAuthenticated
+                            ? Colors.green[700]
+                            : Colors.grey[700],
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: authProvider.isAuthenticated
-                    ? OutlinedButton.icon(
-                        onPressed: () async {
-                          await authProvider.logout();
-                          if (ctx.mounted) Navigator.pop(ctx);
-                        },
-                        icon: const Icon(Icons.logout, color: Colors.red),
-                        label: const Text('تسجيل الخروج من السحابة',
-                            style: TextStyle(color: Colors.red)),
-                      )
-                    : ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const LoginScreen()),
-                          );
-                        },
-                        icon: const Icon(Icons.login),
-                        label: const Text('تسجيل الدخول / إنشاء حساب'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue[800],
-                          foregroundColor: Colors.white,
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              authProvider.isAuthenticated
+                                  ? authProvider.currentUser!.username
+                                  : 'الوضع المحلي (بدون حساب)',
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            Text(
+                              authProvider.isAuthenticated
+                                  ? authProvider.currentUser!.email
+                                  : 'سجل دخولك لتفعيل النسخ الاحتياطي السحابي',
+                              style: const TextStyle(
+                                  fontSize: 12, color: Colors.black54),
+                            ),
+                          ],
                         ),
                       ),
-              ),
-              const Divider(height: 24),
-              const Text('اختر العملة الأساسية:'),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                initialValue: txProvider.currency,
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ],
+                  ),
                 ),
-                items: availableCurrencies.map((String c) {
-                  return DropdownMenuItem<String>(value: c, child: Text(c));
-                }).toList(),
-                onChanged: (String? newValue) {
-                  if (newValue != null) {
-                    txProvider.updateCurrency(newValue);
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: authProvider.isAuthenticated
+                      ? OutlinedButton.icon(
+                          onPressed: () async {
+                            await authProvider.logout();
+                            if (ctx.mounted) Navigator.pop(ctx);
+                          },
+                          icon: const Icon(Icons.logout, color: Colors.red),
+                          label: const Text('تسجيل الخروج من السحابة',
+                              style: TextStyle(color: Colors.red)),
+                        )
+                      : ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const LoginScreen()),
+                            );
+                          },
+                          icon: const Icon(Icons.login),
+                          label: const Text('تسجيل الدخول / إنشاء حساب'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue[800],
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                ),
+                const Divider(height: 24),
+                const Text('اختر العملة الأساسية:'),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  initialValue: txProvider.currency,
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                  items: availableCurrencies.map((String c) {
+                    return DropdownMenuItem<String>(value: c, child: Text(c));
+                  }).toList(),
+                  onChanged: (String? newValue) {
+                    if (newValue != null) {
+                      txProvider.updateCurrency(newValue);
+                      Navigator.pop(ctx);
+                    }
+                  },
+                ),
+                const Divider(height: 24),
+                // زر عرض الدليل التعليمي للتطبيق
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.help_outline, color: Colors.blue[800]),
+                  title: const Text('دليل استخدام التطبيق (الشرح التعليمي)'),
+                  onTap: () {
                     Navigator.pop(ctx);
-                  }
-                },
-              ),
-            ],
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            const OnboardingScreen(isFromHome: true),
+                      ),
+                    );
+                  },
+                ),
+                // زر تواصل معنا داخل الإعدادات أيضاً
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading:
+                      Icon(Icons.support_agent_rounded, color: Colors.green[700]),
+                  title: const Text('تواصل معنا (واتساب / لينكد إن)'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showContactUsDialog(context);
+                  },
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -387,13 +566,12 @@ class _HomeScreenState extends State<HomeScreen> {
           appBar: AppBar(
             backgroundColor: Colors.blue[800],
             foregroundColor: Colors.white,
-            // زر التبديل السريع بين المحافظ في عنوان الشريط العلوي
             title: InkWell(
               onTap: () => _showWalletsBottomSheet(context, provider),
               borderRadius: BorderRadius.circular(12),
               child: Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
@@ -401,27 +579,27 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.account_balance_wallet, size: 20),
-                    const SizedBox(width: 8),
+                    const Icon(Icons.account_balance_wallet, size: 18),
+                    const SizedBox(width: 6),
                     Flexible(
                       child: Text(
                         currentWalletName,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: 17,
+                          fontSize: 16,
                           color: Colors.white,
                         ),
                       ),
                     ),
                     const SizedBox(width: 4),
-                    const Icon(Icons.keyboard_arrow_down, size: 20),
+                    const Icon(Icons.keyboard_arrow_down, size: 18),
                   ],
                 ),
               ),
             ),
             actions: [
-              // زر المزامنة السحابية والنسخ الاحتياطي
+              // زر المزامنة السحابية
               IconButton(
                 tooltip: 'المزامنة السحابية',
                 onPressed: provider.isSyncing
@@ -443,6 +621,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             : Icons.cloud_upload_outlined,
                       ),
               ),
+              // زر الإحصائيات
               IconButton(
                 tooltip: 'الإحصائيات',
                 icon: const Icon(Icons.pie_chart),
@@ -454,6 +633,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
                 },
               ),
+              // زر تواصل معنا المباشر في الشريط العلوي
+              IconButton(
+                tooltip: 'تواصل معنا',
+                icon: const Icon(Icons.support_agent_rounded),
+                onPressed: () => _showContactUsDialog(context),
+              ),
+              // زر الإعدادات والحساب والدليل التعليمي
               IconButton(
                 tooltip: 'الإعدادات والحساب',
                 icon: const Icon(Icons.settings),
@@ -542,7 +728,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -551,11 +737,24 @@ class _HomeScreenState extends State<HomeScreen> {
                       style:
                           TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
-                    TextButton.icon(
-                      onPressed: () =>
-                          _showWalletsBottomSheet(context, provider),
-                      icon: const Icon(Icons.swap_horiz, size: 18),
-                      label: const Text('تغيير المحفظة'),
+                    Row(
+                      children: [
+                        TextButton.icon(
+                          onPressed: () => _showContactUsDialog(context),
+                          icon: const Icon(Icons.chat_outlined,
+                              size: 16, color: Colors.green),
+                          label: const Text(
+                            'تواصل معنا',
+                            style: TextStyle(color: Colors.green),
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: () =>
+                              _showWalletsBottomSheet(context, provider),
+                          icon: const Icon(Icons.swap_horiz, size: 18),
+                          label: const Text('تغيير المحفظة'),
+                        ),
+                      ],
                     ),
                   ],
                 ),
