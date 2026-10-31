@@ -28,8 +28,11 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  Future<void> _submitForm() async {
+ Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
+
+    // إخفاء لوحة المفاتيح فور الضغط
+    FocusScope.of(context).unfocus();
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final txProvider = Provider.of<TransactionProvider>(context, listen: false);
@@ -51,14 +54,15 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
 
     if (success) {
-      // تشغيل المزامنة الفورية بعد تسجيل الدخول لرفع واسترجاع المحافظ والمعاملات
-      await txProvider.syncWithCloud(manual: true);
-      if (!mounted) return;
+      // 1. تشغيل المزامنة في الخلفية فوراً دون تعطيل الانتقال للشاشة الرئيسية
+      txProvider.syncWithCloud(manual: true);
+
+      // 2. إظهار رسالة النجاح والانتقال الفوري للشاشة الرئيسية من أول ضغطة
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(_isLoginMode
-              ? 'تم تسجيل الدخول ومزامنة البيانات بنجاح'
-              : 'تم إنشاء الحساب ومزامنة البيانات بنجاح'),
+              ? 'تم تسجيل الدخول بنجاح، جاري مزامنة بياناتك...'
+              : 'تم إنشاء الحساب بنجاح، جاري مزامنة بياناتك...'),
           backgroundColor: Colors.green[700],
         ),
       );
@@ -73,7 +77,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _handleGoogleSignIn() async {
+ Future<void> _handleGoogleSignIn() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final txProvider = Provider.of<TransactionProvider>(context, listen: false);
 
@@ -81,11 +85,10 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
 
     if (success) {
-      await txProvider.syncWithCloud(manual: true);
-      if (!mounted) return;
+      txProvider.syncWithCloud(manual: true);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('تم تسجيل الدخول عبر Google ومزامنة البيانات'),
+          content: const Text('تم تسجيل الدخول عبر Google بنجاح'),
           backgroundColor: Colors.green[700],
         ),
       );

@@ -96,7 +96,8 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> loginWithGoogle() async {
     _setLoading(true);
     try {
-      final GoogleSignIn googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
+      final GoogleSignIn googleSignIn = GoogleSignIn(scopes: ['email', 'profile'],
+      serverClientId: '372567522811-rpp073d9blb2d5peoeqtrb17msasnpv5.apps.googleusercontent.com',);
       final GoogleSignInAccount? account = await googleSignIn.signIn();
 
       if (account == null) {
