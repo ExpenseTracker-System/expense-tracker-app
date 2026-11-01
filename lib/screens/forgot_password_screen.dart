@@ -41,16 +41,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     if (otpResult != null) {
       setState(() {
         _otpSent = true;
-        // إذا أرجع السيرفر الكود الرقمي مباشرة، نضعه في الحقل لتسهيل العملية
-        if (otpResult.length == 6 && int.tryParse(otpResult) != null) {
-          _otpController.text = otpResult;
-        }
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('رمز التحقق الخاص بك هو: $otpResult'),
+          content: const Text('تم إرسال رمز التحقق المكون من 6 أرقام إلى بريدك الإلكتروني'),
           backgroundColor: Colors.green[700],
-          duration: const Duration(seconds: 6),
+          duration: const Duration(seconds: 4),
         ),
       );
     } else if (auth.errorMessage != null) {
