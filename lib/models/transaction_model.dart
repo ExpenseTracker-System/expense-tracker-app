@@ -92,18 +92,24 @@ class TransactionModel {
   }
 
   // للإرسال والاستقبال عبر JSON مع سيرفر Spring Boot
-  Map<String, dynamic> toJson() {
+ Map<String, dynamic> toJson() {
+    final String dateIso = date.toLocal().toIso8601String().replaceAll('Z', '');
+    final String createdIso = createdAt.toLocal().toIso8601String().replaceAll('Z', '');
+    final String updatedIso = updatedAt.toLocal().toIso8601String().replaceAll('Z', '');
     return {
       'id': id,
       'amount': amount,
       'category': category,
       'note': note,
       'isIncome': isIncome,
-      'transactionDate': date.toLocal().toIso8601String().replaceAll('Z', ''),
+      'income': isIncome,
+      'transactionDate': dateIso,
+      'transactionsDate': dateIso,
       'walletId': walletId,
       'isDeleted': isDeleted,
-      'createdAt': createdAt.toLocal().toIso8601String().replaceAll('Z', ''),
-      'updatedAt': updatedAt.toLocal().toIso8601String().replaceAll('Z', ''),
+      'deleted': isDeleted,
+      'createdAt': createdIso,
+      'updatedAt': updatedIso,
     };
   }
 

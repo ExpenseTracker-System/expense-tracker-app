@@ -24,7 +24,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     super.dispose();
   }
 
-  Future<void> _sendOtp() async {
+ Future<void> _sendOtp() async {
     if (_emailController.text.trim().isEmpty ||
         !_emailController.text.contains('@')) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -34,17 +34,23 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     }
 
     final auth = Provider.of<AuthProvider>(context, listen: false);
-    final bool ok = await auth.requestPasswordResetOtp(_emailController.text);
+    final String? otpResult =
+        await auth.requestPasswordResetOtp(_emailController.text);
 
     if (!mounted) return;
-    if (ok) {
+    if (otpResult != null) {
       setState(() {
         _otpSent = true;
+        // إذا أرجع السيرفر الكود الرقمي مباشرة، نضعه في الحقل لتسهيل العملية
+        if (otpResult.length == 6 && int.tryParse(otpResult) != null) {
+          _otpController.text = otpResult;
+        }
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('تم إرسال رمز التحقق المكون من 6 أرقام'),
+          content: Text('رمز التحقق الخاص بك هو: $otpResult'),
           backgroundColor: Colors.green[700],
+          duration: const Duration(seconds: 6),
         ),
       );
     } else if (auth.errorMessage != null) {

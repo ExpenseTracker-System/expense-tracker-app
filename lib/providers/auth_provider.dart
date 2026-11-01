@@ -93,31 +93,36 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // 3. تسجيل الدخول بواسطة حساب Google
-  Future<bool> loginWithGoogle() async {
+Future<bool> loginWithGoogle() async {
     _setLoading(true);
     try {
-      final GoogleSignIn googleSignIn = GoogleSignIn(scopes: ['email', 'profile'],
-      serverClientId: '372567522811-rpp073d9blb2d5peoeqtrb17msasnpv5.apps.googleusercontent.com',);
+      final GoogleSignIn googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
+      // تسجيل الخروج المسبق من الجلسة المعلقة لضمان فتح نافذة اختيار الحساب دائماً
+      await googleSignIn.signOut();
       final GoogleSignInAccount? account = await googleSignIn.signIn();
 
       if (account == null) {
-        _errorMessage = 'تم إلغاء تسجيل الدخول عبر جوجل';
+        _errorMessage = 'تم إلغاء اختيار حساب جوجل';
         _setLoading(false);
         return false;
       }
 
       final GoogleSignInAuthentication googleAuth = await account.authentication;
       final String? idToken = googleAuth.idToken;
+      final String? accessToken = googleAuth.accessToken;
 
-      if (idToken == null) {
-        _errorMessage = 'تعذر الحصول على رمز التحقق من جوجل';
+      if (idToken == null && accessToken == null) {
+        _errorMessage = 'تعذر الحصول على رمز المصادقة من جوجل';
         _setLoading(false);
         return false;
       }
 
       final response = await ApiService.instance.post(
         '/api/auth/google',
-        body: {'idToken': idToken},
+        body: {
+          'idToken': idToken,
+          'accessToken': accessToken,
+        },
         requiresAuth: false,
       );
 
@@ -129,27 +134,27 @@ class AuthProvider extends ChangeNotifier {
       _setLoading(false);
       return false;
     } catch (e) {
-      _errorMessage = 'تعذر إتمام تسجيل الدخول عبر جوجل';
+      _errorMessage = 'تأكد من مطابقة بصمة SHA-1 واسم الحزمة في Google Cloud Console';
       _setLoading(false);
       return false;
     }
   }
 
-  // 4. طلب رمز استعادة كلمة المرور (OTP)
-  Future<bool> requestPasswordResetOtp(String email) async {
+  // 4. طلب رمز استعادة كلمة المرور (يرجع الرمز المولد لعرضه للمستخدم)
+  Future<String?> requestPasswordResetOtp(String email) async {
     _setLoading(true);
     try {
       final encodedEmail = Uri.encodeComponent(email.trim());
-      await ApiService.instance.post(
+      final response = await ApiService.instance.post(
         '/api/auth/forgot-password?email=$encodedEmail',
         requiresAuth: false,
       );
       _setLoading(false);
-      return true;
+      return response['data']?.toString() ?? 'تم الإرسال';
     } on ApiException catch (e) {
       _errorMessage = e.message;
       _setLoading(false);
-      return false;
+      return null;
     }
   }
 

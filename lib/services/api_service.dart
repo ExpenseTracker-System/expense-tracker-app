@@ -77,28 +77,41 @@ class ApiService {
 
   // ==================== دوال الطلبات العامة ====================
 
-  Future<JsonMap> post(
+ Future<JsonMap> post(
     String endpoint, {
     JsonMap? body,
     bool requiresAuth = true,
   }) async {
-    try {
-      final Uri uri = Uri.parse('$_baseUrl$endpoint');
-      final HeadersMap headers = await _getHeaders(requiresAuth: requiresAuth);
+    int attempts = 0;
+    while (true) {
+      attempts++;
+      try {
+        final Uri uri = Uri.parse('$_baseUrl$endpoint');
+        final HeadersMap headers = await _getHeaders(requiresAuth: requiresAuth);
 
-      final http.Response response = await http
-          .post(
-            uri,
-            headers: headers,
-            body: body != null ? jsonEncode(body) : null,
-          )
-          .timeout(const Duration(seconds: 60));
+        final http.Response response = await http
+            .post(
+              uri,
+              headers: headers,
+              body: body != null ? jsonEncode(body) : null,
+            )
+            .timeout(const Duration(seconds: 60));
 
-      return _handleResponse(response);
-    } on ApiException {
-      rethrow;
-    } catch (e) {
-      throw ApiException('تعذر الاتصال بالخادم، تأكد من اتصالك بالإنترنت أو عنوان السيرفر');
+        return _handleResponse(response);
+      } on ApiException catch (e) {
+        // إذا حدث خطأ خادم مؤقت (500/502/503) أثناء استيقاظ قاعدة البيانات، نعيد المحاولة مرة واحدة تلقائياً
+        if (attempts < 2 && (e.statusCode == null || e.statusCode! >= 500)) {
+          await Future.delayed(const Duration(seconds: 2));
+          continue;
+        }
+        rethrow;
+      } catch (_) {
+        if (attempts < 2) {
+          await Future.delayed(const Duration(seconds: 2));
+          continue;
+        }
+        throw ApiException('تعذر الاتصال بالخادم، تأكد من اتصالك بالإنترنت أو عنوان السيرفر');
+      }
     }
   }
 
