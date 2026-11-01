@@ -1,6 +1,7 @@
 class WalletModel {
   final String id;
   final String name;
+  final String currency;
   final String? userId;
   final bool isDeleted;
   final DateTime createdAt;
@@ -10,6 +11,7 @@ class WalletModel {
   WalletModel({
     required this.id,
     required this.name,
+    this.currency = 'ريال',
     this.userId,
     this.isDeleted = false,
     DateTime? createdAt,
@@ -21,6 +23,7 @@ class WalletModel {
   WalletModel copyWith({
     String? id,
     String? name,
+    String? currency,
     String? userId,
     bool? isDeleted,
     DateTime? createdAt,
@@ -30,6 +33,7 @@ class WalletModel {
     return WalletModel(
       id: id ?? this.id,
       name: name ?? this.name,
+      currency: currency ?? this.currency,
       userId: userId ?? this.userId,
       isDeleted: isDeleted ?? this.isDeleted,
       createdAt: createdAt ?? this.createdAt,
@@ -43,6 +47,7 @@ class WalletModel {
     return {
       'id': id,
       'name': name,
+      'currency': currency.isNotEmpty ? currency : 'ريال',
       'userId': userId,
       'isDeleted': isDeleted ? 1 : 0,
       'createdAt': createdAt.toLocal().toIso8601String().replaceAll('Z', ''),
@@ -52,9 +57,11 @@ class WalletModel {
   }
 
   factory WalletModel.fromMap(Map<String, dynamic> map) {
+    final String rawCurrency = (map['currency'] ?? 'ريال').toString();
     return WalletModel(
       id: map['id'] as String,
       name: map['name'] as String,
+      currency: rawCurrency.isNotEmpty ? rawCurrency : 'ريال',
       userId: map['userId'] as String?,
       isDeleted: (map['isDeleted'] ?? 0) == 1,
       createdAt: map['createdAt'] != null
@@ -72,17 +79,21 @@ class WalletModel {
     return {
       'id': id,
       'name': name,
+      'currency': currency.isNotEmpty ? currency : 'ريال',
       'userId': userId,
       'isDeleted': isDeleted,
+      'deleted': isDeleted,
       'createdAt': createdAt.toLocal().toIso8601String().replaceAll('Z', ''),
       'updatedAt': updatedAt.toLocal().toIso8601String().replaceAll('Z', ''),
     };
   }
 
   factory WalletModel.fromJson(Map<String, dynamic> json) {
+    final String rawCurrency = (json['currency'] ?? 'ريال').toString();
     return WalletModel(
       id: json['id'] as String,
       name: json['name'] as String,
+      currency: rawCurrency.isNotEmpty ? rawCurrency : 'ريال',
       userId: json['userId'] as String?,
       isDeleted: (json['isDeleted'] ?? json['deleted'] ?? false) as bool,
       createdAt: json['createdAt'] != null

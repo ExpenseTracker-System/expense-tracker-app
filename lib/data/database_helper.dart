@@ -23,7 +23,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3, // تم التحديث إلى الإصدار 3 لإضافة عمود العملة لكل محفظة
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -33,11 +33,12 @@ class DatabaseHelper {
     final now = DateTime.now().toLocal().toIso8601String().replaceAll('Z', '');
     final defaultWalletId = _uuid.v4();
 
-    // 1. إنشاء جدول المحافظ
+    // 1. إنشاء جدول المحافظ (مع عمود العملة)
     await db.execute('''
       CREATE TABLE wallets (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
+        currency TEXT NOT NULL DEFAULT 'ريال',
         userId TEXT,
         isDeleted INTEGER NOT NULL DEFAULT 0,
         createdAt TEXT NOT NULL,
@@ -63,15 +64,16 @@ class DatabaseHelper {
       )
     ''');
 
-    // 3. إنشاء الفهارس لتسريع الفلترة والبحث والمزامنة
+    // 3. إنشاء الفهارس
     await db.execute('CREATE INDEX idx_tx_wallet_deleted ON transactions(walletId, isDeleted, date DESC)');
     await db.execute('CREATE INDEX idx_tx_synced ON transactions(isSynced)');
     await db.execute('CREATE INDEX idx_wallet_deleted ON wallets(isDeleted)');
 
-    // 4. إدراج محفظة افتراضية أولية ليعمل التطبيق فوراً
+    // 4. إدراج المحفظة الافتراضية بعملة الريال
     await db.insert('wallets', {
       'id': defaultWalletId,
       'name': 'المحفظة الشخصية',
+      'currency': 'ريال',
       'userId': null,
       'isDeleted': 0,
       'createdAt': now,
@@ -80,7 +82,7 @@ class DatabaseHelper {
     });
   }
 
-  // ترقية قاعدة البيانات من الإصدار 1 إلى 2 دون فقدان البيانات القديمة للمستخدم
+  // الترقية التلقائية الآمنة دون فقدان البيانات السابقة
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       final now = DateTime.now().toLocal().toIso8601String().replaceAll('Z', '');
@@ -90,6 +92,7 @@ class DatabaseHelper {
         CREATE TABLE IF NOT EXISTS wallets (
           id TEXT PRIMARY KEY,
           name TEXT NOT NULL,
+          currency TEXT NOT NULL DEFAULT 'ريال',
           userId TEXT,
           isDeleted INTEGER NOT NULL DEFAULT 0,
           createdAt TEXT NOT NULL,
@@ -101,6 +104,7 @@ class DatabaseHelper {
       await db.insert('wallets', {
         'id': defaultWalletId,
         'name': 'المحفظة الشخصية',
+        'currency': 'ريال',
         'userId': null,
         'isDeleted': 0,
         'createdAt': now,
@@ -108,7 +112,6 @@ class DatabaseHelper {
         'isSynced': 0,
       });
 
-      // إضافة الأعمدة الجديدة لجدول المعاملات القديم وربطه بالمحفظة الشخصية
       await db.execute("ALTER TABLE transactions ADD COLUMN walletId TEXT NOT NULL DEFAULT '$defaultWalletId'");
       await db.execute('ALTER TABLE transactions ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0');
       await db.execute("ALTER TABLE transactions ADD COLUMN createdAt TEXT NOT NULL DEFAULT '$now'");
@@ -118,6 +121,13 @@ class DatabaseHelper {
       await db.execute('CREATE INDEX IF NOT EXISTS idx_tx_wallet_deleted ON transactions(walletId, isDeleted, date DESC)');
       await db.execute('CREATE INDEX IF NOT EXISTS idx_tx_synced ON transactions(isSynced)');
       await db.execute('CREATE INDEX IF NOT EXISTS idx_wallet_deleted ON wallets(isDeleted)');
+    }
+
+    // ترقية الإصدار 2 إلى 3: إضافة عمود العملة لجدول المحافظ الموجود مسبقاً
+    if (oldVersion >= 2 && oldVersion < 3) {
+      try {
+        await db.execute("ALTER TABLE wallets ADD COLUMN currency TEXT NOT NULL DEFAULT 'ريال'");
+      } catch (_) {}
     }
   }
 
@@ -161,14 +171,12 @@ class DatabaseHelper {
     final now = DateTime.now().toLocal().toIso8601String().replaceAll('Z', '');
 
     await db.transaction((txn) async {
-      // 1. حذف جميع معاملات المحفظة ناعماً
       await txn.update(
         'transactions',
         {'isDeleted': 1, 'updatedAt': now, 'isSynced': 0},
         where: 'walletId = ?',
         whereArgs: [walletId],
       );
-      // 2. حذف المحفظة ناعماً
       await txn.update(
         'wallets',
         {'isDeleted': 1, 'updatedAt': now, 'isSynced': 0},
@@ -218,7 +226,6 @@ class DatabaseHelper {
     );
   }
 
-  // الحذف الناعم لمعاملة واحدة (لضمان مزامنة الحذف مع السيرفر)
   Future<int> deleteTransaction(String id) async {
     final db = await instance.database;
     final now = DateTime.now().toLocal().toIso8601String().replaceAll('Z', '');
@@ -230,7 +237,6 @@ class DatabaseHelper {
     );
   }
 
-  // الحذف الناعم المتعدد (Batch Delete) لتحديد وحذف أكثر من معاملة في وقت واحد
   Future<int> deleteTransactionsInBatch(List<String> ids) async {
     if (ids.isEmpty) return 0;
     final db = await instance.database;
@@ -243,7 +249,6 @@ class DatabaseHelper {
     );
   }
 
-  // البحث النصي والفلترة بين تاريخين داخل المحفظة
   Future<List<TransactionModel>> searchAndFilterTransactions({
     required String walletId,
     String? keyword,
@@ -286,7 +291,7 @@ class DatabaseHelper {
     return result.map((map) => TransactionModel.fromMap(map)).toList();
   }
 
-  // ==================== دوال محرك المزامنة (Sync Engine Helpers) ====================
+  // ==================== دوال محرك المزامنة ====================
 
   Future<List<WalletModel>> getUnsyncedWallets() async {
     final db = await instance.database;
@@ -300,7 +305,6 @@ class DatabaseHelper {
     return result.map((map) => TransactionModel.fromMap(map)).toList();
   }
 
-  // تعليم جميع البيانات المحلية كغير متزامنة عند تسجيل دخول مستخدم جديد لرفعها لحسابه السحابي
   Future<void> markAllDataForSync(String userId) async {
     final db = await instance.database;
     await db.transaction((txn) async {
@@ -309,7 +313,6 @@ class DatabaseHelper {
     });
   }
 
-  // تطبيق نتائج المزامنة القادمة من سيرفر Spring Boot في حزمة واحدة سريعة
   Future<void> applySyncResults({
     required List<String> uploadedWalletIds,
     required List<String> uploadedTransactionIds,
@@ -321,7 +324,6 @@ class DatabaseHelper {
     await db.transaction((txn) async {
       final batch = txn.batch();
 
-      // 1. تعليم العناصر التي تم رفعها بنجاح بأنها متزامنة (isSynced = 1)
       for (final id in uploadedWalletIds) {
         batch.update('wallets', {'isSynced': 1}, where: 'id = ?', whereArgs: [id]);
       }
@@ -329,7 +331,6 @@ class DatabaseHelper {
         batch.update('transactions', {'isSynced': 1}, where: 'id = ?', whereArgs: [id]);
       }
 
-      // 2. إدراج أو تحديث المحافظ القادمة من السيرفر (Downstream)
       for (final sWallet in serverWallets) {
         batch.insert(
           'wallets',
@@ -338,7 +339,6 @@ class DatabaseHelper {
         );
       }
 
-      // 3. إدراج أو تحديث المعاملات القادمة من السيرفر (Downstream)
       for (final sTx in serverTransactions) {
         batch.insert(
           'transactions',

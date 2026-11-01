@@ -18,10 +18,19 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // 🔴 ضع رقمك في واتساب مع مفتاح الدولة (بدون + أو أصفار في البداية) ورابط لينكد إن الخاص بك هنا:
   static const String _developerWhatsApp = '967775407610';
   static const String _developerLinkedIn =
       'https://www.linkedin.com/in/omar-aref-53b710393?utm_source=share_via&utm_content=profile&utm_medium=member_android';
+
+  static const List<String> _availableCurrencies = [
+    'ريال',
+    'دولار',
+    'ريال سعودي',
+    'درهم',
+    'يورو',
+    'دينار',
+    'جنيه',
+  ];
 
   Future<void> _openExternalUrl(String urlString) async {
     final Uri uri = Uri.parse(urlString);
@@ -44,7 +53,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // نافذة "تواصل معنا" الاحترافية (واتساب + لينكد إن + إعادة عرض الشرح)
   void _showContactUsDialog(BuildContext context) {
     final String whatsappUrl =
         'https://wa.me/$_developerWhatsApp?text=${Uri.encodeComponent("مرحباً مهندس عمر، أتواصل معك بخصوص تطبيق محفظتي الذكية")}';
@@ -106,7 +114,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            // زر التواصل عبر واتساب
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
@@ -130,7 +137,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const SizedBox(height: 10),
-            // زر صفحة لينكد إن
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
@@ -165,7 +171,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // نافذة اختيار وإدارة المحافظ المتعددة (BottomSheet)
+  // نافذة اختيار وإدارة المحافظ المتعددة
   void _showWalletsBottomSheet(
       BuildContext context, TransactionProvider provider) {
     showModalBottomSheet(
@@ -256,15 +262,15 @@ class _HomeScreenState extends State<HomeScreen> {
                                     : Colors.black87,
                               ),
                             ),
-                            subtitle: isSelected
-                                ? const Text(
-                                    'المحفظة النشطة حالياً',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.blue,
-                                    ),
-                                  )
-                                : null,
+                            subtitle: Text(
+                              'العملة: ${wallet.currency}${isSelected ? " • (نشطة حالياً)" : ""}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isSelected
+                                    ? Colors.blue[700]
+                                    : Colors.grey[600],
+                              ),
+                            ),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -328,6 +334,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // نافذة إضافة أو تعديل محفظة (مع اختيار العملة الخاصة بها)
   void _showAddOrEditWalletDialog(
     BuildContext context,
     TransactionProvider provider, {
@@ -335,40 +342,77 @@ class _HomeScreenState extends State<HomeScreen> {
   }) {
     final nameController =
         TextEditingController(text: existingWallet?.name ?? '');
+    String selectedCurrency = existingWallet?.currency ?? 'ريال';
+    if (!_availableCurrencies.contains(selectedCurrency)) {
+      selectedCurrency = 'ريال';
+    }
+
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(existingWallet == null
-            ? 'إنشاء محفظة جديدة'
-            : 'تعديل اسم المحفظة'),
-        content: TextField(
-          controller: nameController,
-          decoration: InputDecoration(
-            hintText: 'مثال: مصاريف العمل، مصاريف المشروع...',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(existingWallet == null
+              ? 'إنشاء محفظة جديدة'
+              : 'تعديل بيانات المحفظة'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: InputDecoration(
+                  labelText: 'اسم المحفظة',
+                  hintText: 'مثال: مصاريف العمل، محفظة الدولار...',
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                initialValue: selectedCurrency,
+                decoration: InputDecoration(
+                  labelText: 'عملة هذه المحفظة',
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  prefixIcon: const Icon(Icons.payments_outlined),
+                ),
+                items: _availableCurrencies.map((String c) {
+                  return DropdownMenuItem<String>(value: c, child: Text(c));
+                }).toList(),
+                onChanged: (String? val) {
+                  if (val != null) {
+                    setDialogState(() {
+                      selectedCurrency = val;
+                    });
+                  }
+                },
+              ),
+            ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('إلغاء'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final name = nameController.text.trim();
-              if (name.isNotEmpty) {
-                if (existingWallet == null) {
-                  provider.addWallet(name);
-                } else {
-                  provider.updateWalletName(existingWallet, name);
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('إلغاء'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final name = nameController.text.trim();
+                if (name.isNotEmpty) {
+                  if (existingWallet == null) {
+                    provider.addWallet(name, walletCurrency: selectedCurrency);
+                  } else {
+                    provider.updateWalletDetails(
+                        existingWallet, name, selectedCurrency);
+                  }
+                  Navigator.pop(ctx);
                 }
-                Navigator.pop(ctx);
-              }
-            },
-            child: const Text('حفظ'),
-          ),
-        ],
+              },
+              child: const Text('حفظ'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -378,14 +422,12 @@ class _HomeScreenState extends State<HomeScreen> {
     TransactionProvider txProvider,
     AuthProvider authProvider,
   ) {
-    final List<String> availableCurrencies = [
-      'ريال',
-      'دولار',
-      'يورو',
-      'درهم',
-      'دينار',
-      'جنيه'
-    ];
+    final String activeWalletName =
+        txProvider.currentWallet?.name ?? 'المحفظة الحالية';
+    final String activeCurrency =
+        _availableCurrencies.contains(txProvider.currency)
+            ? txProvider.currency
+            : 'ريال';
 
     showDialog(
       context: context,
@@ -472,17 +514,18 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                 ),
                 const Divider(height: 24),
-                const Text('اختر العملة الأساسية:'),
+                Text('عملة محفظة "$activeWalletName":',
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 10),
                 DropdownButtonFormField<String>(
-                  initialValue: txProvider.currency,
+                  initialValue: activeCurrency,
                   decoration: InputDecoration(
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12)),
                     contentPadding:
                         const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   ),
-                  items: availableCurrencies.map((String c) {
+                  items: _availableCurrencies.map((String c) {
                     return DropdownMenuItem<String>(value: c, child: Text(c));
                   }).toList(),
                   onChanged: (String? newValue) {
@@ -493,7 +536,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                 ),
                 const Divider(height: 24),
-                // زر عرض الدليل التعليمي للتطبيق
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: Icon(Icons.help_outline, color: Colors.blue[800]),
@@ -509,11 +551,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     );
                   },
                 ),
-                // زر تواصل معنا داخل الإعدادات أيضاً
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading:
-                      Icon(Icons.support_agent_rounded, color: Colors.green[700]),
+                  leading: Icon(Icons.support_agent_rounded,
+                      color: Colors.green[700]),
                   title: const Text('تواصل معنا (واتساب / لينكد إن)'),
                   onTap: () {
                     Navigator.pop(ctx);
@@ -599,7 +640,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             actions: [
-              // زر المزامنة السحابية
               IconButton(
                 tooltip: 'المزامنة السحابية',
                 onPressed: provider.isSyncing
@@ -621,7 +661,6 @@ class _HomeScreenState extends State<HomeScreen> {
                             : Icons.cloud_upload_outlined,
                       ),
               ),
-              // زر الإحصائيات
               IconButton(
                 tooltip: 'الإحصائيات',
                 icon: const Icon(Icons.pie_chart),
@@ -633,13 +672,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
                 },
               ),
-              // زر تواصل معنا المباشر في الشريط العلوي
               IconButton(
                 tooltip: 'تواصل معنا',
                 icon: const Icon(Icons.support_agent_rounded),
                 onPressed: () => _showContactUsDialog(context),
               ),
-              // زر الإعدادات والحساب والدليل التعليمي
               IconButton(
                 tooltip: 'الإعدادات والحساب',
                 icon: const Icon(Icons.settings),

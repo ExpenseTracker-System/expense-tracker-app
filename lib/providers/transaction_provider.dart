@@ -16,7 +16,6 @@ class TransactionProvider extends ChangeNotifier {
   WalletModel? _currentWallet;
   List<TransactionModel> _transactions = [];
 
-  String _currency = 'ريال';
   SharedPreferences? _prefs;
 
   List<String> _incomeCategories = ['راتب', 'مكافأة', 'مبيعات', 'هدايا', 'أخرى'];
@@ -31,14 +30,16 @@ class TransactionProvider extends ChangeNotifier {
   List<WalletModel> get wallets => _wallets;
   WalletModel? get currentWallet => _currentWallet;
   List<TransactionModel> get transactions => _transactions;
-  String get currency => _currency;
+
+  // العملة الآن مرتبطة بالمحفظة النشطة حالياً (وتكون افتراضياً ريال)
+  String get currency => _currentWallet?.currency ?? 'ريال';
+
   List<String> get incomeCategories => _incomeCategories;
   List<String> get expenseCategories => _expenseCategories;
   bool get isSyncing => _isSyncing;
   DateTime? get lastSyncTime => _lastSyncTime;
   String? get syncStatusMessage => _syncStatusMessage;
 
-  // حساب الأرصدة الخاصة بالمحفظة النشطة حالياً
   double get totalIncome => _transactions
       .where((tx) => tx.isIncome)
       .fold(0.0, (sum, tx) => sum + tx.amount);
@@ -58,11 +59,9 @@ class TransactionProvider extends ChangeNotifier {
     await loadWalletsAndTransactions();
     _lastSyncTime = await SyncService.instance.getLastSyncTime();
     _listenToConnectivityChanges();
-    // محاولة مزامنة تلقائية هادئة عند فتح التطبيق
     unawaited(syncWithCloud(manual: false));
   }
 
-  // مراقبة عودة الإنترنت لتشغيل المزامنة التلقائية (Auto-Sync)
   void _listenToConnectivityChanges() {
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen((results) {
       final hasConnection = results.any((r) => r != ConnectivityResult.none);
@@ -78,16 +77,10 @@ class TransactionProvider extends ChangeNotifier {
     super.dispose();
   }
 
-  // ==================== إعدادات العملة والفئات ====================
+  // ==================== إعدادات الفئات وعملة المحفظة ====================
 
   Future<void> _initPreferences() async {
     _prefs = await SharedPreferences.getInstance();
-
-    if (_prefs!.containsKey('currency')) {
-      _currency = _prefs!.getString('currency')!;
-    } else {
-      await _prefs!.setString('currency', _currency);
-    }
 
     if (_prefs!.containsKey('income_categories')) {
       _incomeCategories = _prefs!.getStringList('income_categories')!;
@@ -104,10 +97,24 @@ class TransactionProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // تحديث عملة المحفظة النشطة حالياً فقط وحفظها في قاعدة البيانات ومزامنتها
   Future<void> updateCurrency(String newCurrency) async {
-    _currency = newCurrency;
-    await _prefs?.setString('currency', newCurrency);
+    if (_currentWallet == null) return;
+    final updatedWallet = _currentWallet!.copyWith(
+      currency: newCurrency,
+      updatedAt: DateTime.now(),
+      isSynced: false,
+    );
+
+    await DatabaseHelper.instance.updateWallet(updatedWallet);
+
+    final index = _wallets.indexWhere((w) => w.id == updatedWallet.id);
+    if (index != -1) {
+      _wallets[index] = updatedWallet;
+    }
+    _currentWallet = updatedWallet;
     notifyListeners();
+    unawaited(syncWithCloud(manual: false));
   }
 
   Future<void> addCategory(String category, bool isIncome) async {
@@ -130,17 +137,16 @@ class TransactionProvider extends ChangeNotifier {
   Future<void> loadWalletsAndTransactions() async {
     _wallets = await DatabaseHelper.instance.getAllWallets();
 
-    // إذا لم توجد أي محفظة (مثلاً بعد مسح الكل)، ننشئ محفظة شخصية افتراضية
     if (_wallets.isEmpty) {
       final defaultWallet = WalletModel(
         id: _uuid.v4(),
         name: 'المحفظة الشخصية',
+        currency: 'ريال',
       );
       await DatabaseHelper.instance.insertWallet(defaultWallet);
       _wallets = [defaultWallet];
     }
 
-    // استرجاع آخر محفظة كان المستخدم يقف عليها
     final savedWalletId = _prefs?.getString('selected_wallet_id');
     if (savedWalletId != null) {
       _currentWallet = _wallets.firstWhere(
@@ -161,10 +167,11 @@ class TransactionProvider extends ChangeNotifier {
     await fetchTransactions();
   }
 
-  Future<void> addWallet(String name) async {
+  Future<void> addWallet(String name, {String walletCurrency = 'ريال'}) async {
     final newWallet = WalletModel(
       id: _uuid.v4(),
       name: name.trim(),
+      currency: walletCurrency,
     );
     await DatabaseHelper.instance.insertWallet(newWallet);
     _wallets.add(newWallet);
@@ -172,8 +179,17 @@ class TransactionProvider extends ChangeNotifier {
     unawaited(syncWithCloud(manual: false));
   }
 
-  Future<void> updateWalletName(WalletModel wallet, String newName) async {
-    final updated = wallet.copyWith(name: newName.trim(), updatedAt: DateTime.now());
+  Future<void> updateWalletDetails(
+    WalletModel wallet,
+    String newName,
+    String newCurrency,
+  ) async {
+    final updated = wallet.copyWith(
+      name: newName.trim(),
+      currency: newCurrency,
+      updatedAt: DateTime.now(),
+      isSynced: false,
+    );
     await DatabaseHelper.instance.updateWallet(updated);
 
     final index = _wallets.indexWhere((w) => w.id == wallet.id);
@@ -188,7 +204,6 @@ class TransactionProvider extends ChangeNotifier {
   }
 
   Future<bool> deleteWallet(String walletId) async {
-    // منع حذف المحفظة الوحيدة المتبقية
     if (_wallets.length <= 1) {
       return false;
     }
@@ -256,7 +271,6 @@ class TransactionProvider extends ChangeNotifier {
     unawaited(syncWithCloud(manual: false));
   }
 
-  // حذف مجموعة من المعاملات المحددة دفعة واحدة (Batch Delete)
   Future<void> deleteTransactionsInBatch(List<String> ids) async {
     if (ids.isEmpty) return;
     await DatabaseHelper.instance.deleteTransactionsInBatch(ids);
@@ -267,7 +281,6 @@ class TransactionProvider extends ChangeNotifier {
     unawaited(syncWithCloud(manual: false));
   }
 
-  // البحث النصي والفلترة بين تاريخين
   Future<List<TransactionModel>> filterTransactions({
     String? keyword,
     DateTime? startDate,
@@ -282,7 +295,7 @@ class TransactionProvider extends ChangeNotifier {
     );
   }
 
-  // ==================== المزامنة السحابية (Cloud Sync) ====================
+  // ==================== المزامنة السحابية ====================
 
   Future<bool> syncWithCloud({bool manual = true}) async {
     if (_isSyncing) return false;
