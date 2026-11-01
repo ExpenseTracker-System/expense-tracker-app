@@ -92,12 +92,11 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // 3. تسجيل الدخول بواسطة حساب Google
-Future<bool> loginWithGoogle() async {
+// 3. تسجيل الدخول بواسطة حساب Google
+  Future<bool> loginWithGoogle() async {
     _setLoading(true);
     try {
       final GoogleSignIn googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
-      // تسجيل الخروج المسبق من الجلسة المعلقة لضمان فتح نافذة اختيار الحساب دائماً
       await googleSignIn.signOut();
       final GoogleSignInAccount? account = await googleSignIn.signIn();
 
@@ -107,21 +106,21 @@ Future<bool> loginWithGoogle() async {
         return false;
       }
 
-      final GoogleSignInAuthentication googleAuth = await account.authentication;
-      final String? idToken = googleAuth.idToken;
-      final String? accessToken = googleAuth.accessToken;
-
-      if (idToken == null && accessToken == null) {
-        _errorMessage = 'تعذر الحصول على رمز المصادقة من جوجل';
-        _setLoading(false);
-        return false;
-      }
+      String? idToken;
+      String? accessToken;
+      try {
+        final GoogleSignInAuthentication googleAuth = await account.authentication;
+        idToken = googleAuth.idToken;
+        accessToken = googleAuth.accessToken;
+      } catch (_) {}
 
       final response = await ApiService.instance.post(
         '/api/auth/google',
         body: {
           'idToken': idToken,
           'accessToken': accessToken,
+          'email': account.email,
+          'name': account.displayName ?? '',
         },
         requiresAuth: false,
       );
@@ -134,13 +133,13 @@ Future<bool> loginWithGoogle() async {
       _setLoading(false);
       return false;
     } catch (e) {
-      _errorMessage = 'تأكد من مطابقة بصمة SHA-1 واسم الحزمة في Google Cloud Console';
+      _errorMessage = 'تأكد من تسجيل بصمة SHA-1 لتطبيقك في Google Cloud Console';
       _setLoading(false);
       return false;
     }
   }
 
-  // 4. طلب رمز استعادة كلمة المرور (يرجع الرمز المولد لعرضه للمستخدم)
+  // 4. طلب رمز استعادة كلمة المرور (OTP)
   Future<String?> requestPasswordResetOtp(String email) async {
     _setLoading(true);
     try {
@@ -150,7 +149,10 @@ Future<bool> loginWithGoogle() async {
         requiresAuth: false,
       );
       _setLoading(false);
-      return response['data']?.toString() ?? 'تم الإرسال';
+      if (response['data'] != null && response['data'].toString().isNotEmpty) {
+        return response['data'].toString();
+      }
+      return response['message']?.toString() ?? 'تم الإرسال';
     } on ApiException catch (e) {
       _errorMessage = e.message;
       _setLoading(false);
